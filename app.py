@@ -19,31 +19,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# 3. 邀請碼驗證 (本地直通版)
-with st.sidebar:
-    st.title("🔐 成員准入")
-    target_code = "DSE2026"  # 你的預設邀請碼
-    user_input = st.text_input("請輸入邀請碼解鎖功能", type="password")
-    
-    if not user_input:
-        st.info("請輸入邀請碼以開始。")
-        st.stop()
-        
-    if user_input != target_code:
-        st.error("❌ 邀請碼錯誤！")
-        st.stop()
-
-    st.success("✅ 驗證成功")
-    st.divider()
-    st.title("📚 DSE 工具箱")
-    with st.expander("5** 必背連詞"):
-        st.markdown("- Paradoxically\n- Notwithstanding\n- In tandem with")
-
-# =========================================================
-# 4. 主畫面邏輯 (驗證通過後顯示)
-# =========================================================
-
-# 初始化 API 客戶端
+# 3. 初始化 API 客戶端
 # 提醒：請確保你的 .streamlit/secrets.toml 有 GEMINI_API_KEY
 api_key = st.secrets.get("GEMINI_API_KEY", "")
 
@@ -53,10 +29,17 @@ def get_client(key):
 
 client = get_client(api_key)
 
-if not client:
-    st.error("⚠️ 找不到 API Key。請檢查 .streamlit/secrets.toml 檔案。")
-    st.stop()
+# 4. 側邊欄：工具箱 (已移除驗證邏輯)
+with st.sidebar:
+    st.title("📚 DSE 提分工具")
+    st.info("💡 歡迎使用！直接在右側提交作文即可開始批改。")
+    st.divider()
+    with st.expander("5** 必背連詞"):
+        st.markdown("- **Paradoxically**\n- **Notwithstanding**\n- **In tandem with**")
+    with st.expander("詞彙升級表"):
+        st.table({"普通": ["Think", "Help", "Big"], "5**級別": ["Advocate", "Facilitate", "Substantial"]})
 
+# 5. 主畫面邏輯
 # 初始化狀態變量
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
@@ -66,6 +49,12 @@ if "last_report" not in st.session_state:
     st.session_state.last_report = ""
 
 st.title("🤖 DSE AI 超級導師 Pro")
+st.caption("全港首個基於考官邏輯的 AI 互動批改平台")
+
+# 如果 API Key 缺失的警告
+if not client:
+    st.error("⚠️ 偵測不到 API Key。請確保 .streamlit/secrets.toml 中設定了 GEMINI_API_KEY。")
+    st.stop()
 
 tab1, tab2 = st.tabs(["📝 作文深度批改", "✨ 金句實驗室"])
 
@@ -122,7 +111,7 @@ with tab1:
                 with st.chat_message("user"): st.write(prompt_input)
                 
                 with st.chat_message("assistant"):
-                    context = f"報告: {st.session_state.last_report}\n提問: {prompt_input}"
+                    context = f"原文內容: {user_text}\n批改報告: {st.session_state.last_report}\n學生提問: {prompt_input}"
                     res = client.models.generate_content(model="gemini-2.0-flash", contents=context)
                     st.write(res.text)
                     st.session_state.chat_history.append({"role": "assistant", "content": res.text})
@@ -132,12 +121,12 @@ with tab2:
     st.markdown("### ✨ Level 5** 金句升級實驗室")
     st.write("輸入一個普通的句子，讓 AI 幫你升級成 5** 水平的高級表達。")
     
-    s_input = st.text_input("輸入你想升級的句子（例如：I think this is good）：")
+    s_input = st.text_input("輸入你想升級的句子：", placeholder="e.g. Many people agree that technology is important.")
     
     if st.button("✨ 瞬間升級"):
         if s_input:
             with st.spinner("正在優化語言結構..."):
-                lab_prompt = f"請將以下句子改寫為 DSE Level 5** 水平的高級英語，使用更深層的詞彙和複雜句式，並用繁體中文解釋加分點：{s_input}"
+                lab_prompt = f"將此句子改寫為 DSE Level 5** 水平的高級英語，使用高級詞彙和句式，並用繁體中文解釋加分點：{s_input}"
                 res = client.models.generate_content(model="gemini-2.0-flash", contents=lab_prompt)
                 st.success("升級成功！")
                 st.markdown(f'<div class="report-card">{res.text}</div>', unsafe_allow_html=True)
