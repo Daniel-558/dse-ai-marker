@@ -1,71 +1,68 @@
 import streamlit as st
-import os
 from google.genai import Client
 
-# 1. 页面配置
-st.set_page_config(page_title="DSE AI 精批助手", layout="wide")
-
-# 2. 从 Secrets 读取 API Key
+# 1. 配置
+st.set_page_config(page_title="DSE 超级导师 AI", layout="wide")
 api_key_val = st.secrets.get("GEMINI_API_KEY", "")
 
-# 3. 初始化客户端
 @st.cache_resource
 def get_client(key):
-    if not key:
-        return None
-    try:
-        return Client(api_key=key)
-    except:
-        return None
+    return Client(api_key=key) if key else None
 
 client = get_client(api_key_val)
 
-# --- 界面开始 ---
-st.title("📝 DSE English Writing AI Marker")
-st.caption("项目蓝图阶段：DSE 英文作文 AI 精批 MVP")
+# 初始化对话历史
+if "chat_history" not in st.session_state:
+    st.session_state.chat_history = []
+if "last_report" not in st.session_state:
+    st.session_state.last_report = ""
 
-if not api_key_val:
-    st.error("⚠️ 未检测到 API Key，请在 Streamlit Cloud 后台配置 Secrets")
-    st.stop()
+st.title("🤖 DSE AI 超级导师")
+st.caption("24小时在线：批改、讲解、追问，一站式搞定")
 
 col1, col2 = st.columns([1, 1])
 
 with col1:
-    st.markdown("### 📥 上传作文片段")
+    st.markdown("### ✍️ 第一步：提交作文")
     task_type = st.selectbox("选择题型", ["Part A", "Part B", "Argumentative", "Letter to Editor"])
     target_lv = st.select_slider("目标等级", options=["3", "4", "5", "5*", "5**"])
-    user_text = st.text_area("在此粘贴你的作文...", height=300)
+    user_text = st.text_area("粘贴你的作文内容...", height=250)
     
-    submit_button = st.button("🚀 开始智能批改", use_container_width=True)
+    if st.button("🚀 深度批改报告", use_container_width=True):
+        if user_text:
+            with st.spinner("阅卷官正在深度分析..."):
+                prompt = f"你是一位精通DSE评分标准的考官，请针对这篇{task_type}作文给Level {target_lv}目标的同学写一份详细批改报告。必须包含评分、语法改进建议、5**范文改写和Killer词汇。请用繁体中文。"
+                response = client.models.generate_content(model="gemini-3-flash-preview", contents=[prompt, user_text])
+                st.session_state.last_report = response.text
+                # 存入对话背景
+                st.session_state.chat_history = [("AI", "这是你的批改报告。如果有任何不明白的地方，比如某个语法点或词汇用法，可以直接在下方问我！")]
+        else:
+            st.warning("请输入内容")
+
+    if st.session_state.last_report:
+        st.markdown("---")
+        st.markdown("### 💡 批改详情")
+        st.markdown(st.session_state.last_report)
 
 with col2:
-    st.markdown("### 📋 批改报告")
-    if submit_button and user_text:
-        with st.spinner("DSE 阅卷员正在评阅中..."):
-            # 这里的 prompt 必须严格对齐
-            prompt = f"""
-            你是一位资深 DSE 英语科阅卷员。请针对以下 {task_type} 作文进行精批。
-            学生目标等级：Level {target_lv}。
-            待批改文本: "{user_text}"
-            请按以下格式输出报告：
-            # 📊 DSE 预估评分报告
-            ## 1. 总体等级预估: [Level X]
-            ## 2. 三大维度分析: (Content, Language, Organization)
-            ## 3. Level 5** 示范改写
-            ## 4. 重点词汇升级 (Killer Vocab)
-            请使用繁体中文回答。
-            """
-            
-            try:
-                response = client.models.generate_content(
-                    model="gemini-3-flash-preview",
-                    contents=prompt
-                )
-                st.markdown(response.text)
-                st.success("批改完成！")
-            except Exception as e:
-                st.error(f"AI 调用失败，请检查网络或 API Key。错误详情: {e}")
-    elif submit_button and not user_text:
-        st.warning("请先输入作文内容。")
+    st.markdown("### 💬 第二 step：与导师互动")
+    if not st.session_state.last_report:
+        st.info("完成左侧批改后，即可开启 1-on-1 追问模式。")
     else:
-        st.info("👈 请在左侧输入内容并点击按钮开始。")
+        # 显示对话历史
+        for role, text in st.session_state.chat_history:
+            with st.chat_message(role):
+                st.write(text)
+        
+        # 追问输入框
+        if prompt_input := st.chat_input("问问导师：为什么这里要这样改？"):
+            st.session_state.chat_history.append(("User", prompt_input))
+            with st.chat_message("User"):
+                st.write(prompt_input)
+            
+            with st.chat_message("AI"):
+                # 将作文内容、批改报告和对话历史作为上下文发给 AI
+                context = f"学生作文: {user_text}\n\n你的批改报告: {st.session_state.last_report}\n\n学生现在问: {prompt_input}"
+                response = client.models.generate_content(model="gemini-3-flash-preview", contents=context)
+                st.write(response.text)
+                st.session_state.chat_history.append(("AI", response.text))
