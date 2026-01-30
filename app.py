@@ -90,3 +90,17 @@ with col2:
                 response = client.models.generate_content(model="gemini-3-flash-preview", contents=context)
                 st.write(response.text)
                 st.session_state.chat_history.append(("AI", response.text))
+                # 在原有代码的 col1 部分，增加一个新的功能块
+with col1:
+    st.markdown("---")
+    st.markdown("### 💡 金句实验室 (Sentence Booster)")
+    target_sentence = st.text_input("输入一个普通句子，我帮你升级成 5** 句式：", placeholder="例如: Plastic bags are bad for the environment.")
+    
+    if st.button("✨ 瞬间升级", use_container_width=True):
+        if target_sentence:
+            with st.spinner("正在注入 5** 灵魂..."):
+                boost_prompt = f"你是一位 DSE 补习名师。请将以下句子升级为 Level 5** 水平。要求：使用更高级的词汇（Killer Vocab）、复杂的从句结构，并解释改写后的加分点。句子：{target_sentence}"
+                boost_response = client.models.generate_content(model="gemini-3-flash-preview", contents=boost_prompt)
+                st.success("升级成功！")
+                st.markdown(boost_response.text)
+
