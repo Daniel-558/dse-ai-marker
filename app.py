@@ -45,4 +45,12 @@ with col2:
                 prompt = f"""
                 你是一位资深 DSE 英语科阅卷员。请针对以下 {task_type} 作文进行精批。
                 学生目标等级：Level {target_lv}。
-                待批改
+                待批改文本: "{user_text}"
+                请按以下格式输出报告：
+                # 📊 DSE 预估评分报告
+                ## 1. 总体等级预估: [Level X]
+                ## 2. 三大维度分析: (Content, Language, Organization)
+                ## 3. Level 5** 示范改写
+                ## 4. 重点词汇升级 (Killer Vocab)
+                请使用繁体中文回答。
+                """ 
