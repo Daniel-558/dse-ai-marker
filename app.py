@@ -3,6 +3,47 @@ from google.genai import Client
 import plotly.graph_objects as go
 import re
 
+# 1. 页面配置与美化
+st.set_page_config(page_title="DSE AI 超级导师", layout="wide")
+
+# 注入自定义 CSS 样式
+st.markdown("""
+    <style>
+    /* 全局背景色与字体 */
+    .main {
+        background-color: #f8f9fa;
+    }
+    /* 标题样式：深蓝色与金边 */
+    h1 {
+        color: #1e3a8a !important;
+        font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+        font-weight: 800;
+        border-bottom: 2px solid #fbbf24;
+        padding-bottom: 10px;
+    }
+    /* 按钮样式：变成醒目的金黄色 */
+    .stButton>button {
+        background-color: #1e3a8a;
+        color: white;
+        border-radius: 8px;
+        height: 3em;
+        transition: all 0.3s;
+        border: none;
+        font-weight: bold;
+    }
+    .stButton>button:hover {
+        background-color: #fbbf24;
+        color: #1e3a8a;
+        transform: scale(1.02);
+    }
+    /* 聊天气泡美化 */
+    .stChatMessage {
+        border-radius: 15px;
+        padding: 10px;
+        margin-bottom: 10px;
+    }
+    </style>
+    """, unsafe_allow_stdio=True, unsafe_allow_html=True)
 # 1. 配置
 st.set_page_config(page_title="DSE 超级导师 AI", layout="wide")
 api_key_val = st.secrets.get("GEMINI_API_KEY", "")
@@ -103,4 +144,5 @@ with col1:
                 boost_response = client.models.generate_content(model="gemini-3-flash-preview", contents=boost_prompt)
                 st.success("升级成功！")
                 st.markdown(boost_response.text)
+
 
