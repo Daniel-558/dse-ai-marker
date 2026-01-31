@@ -180,12 +180,21 @@ if "數學" in selected_subject:
             func, display_eq = parse_equation(eq_input)
             
             if func:
-                # 生成數據點
-                x_vals = np.linspace(-10, 10, 800)
+                # --- 修改 1: 大幅擴大計算範圍與密度 ---
+                # 之前是 -10 到 10，現在擴大到 -100 到 100，並增加點數(4000點)以保證平滑
+                x_vals = np.linspace(-100, 100, 4000) 
+                
                 try:
                     y_vals = func(x_vals)
-                    # 處理無窮大或複數情況
-                    if isinstance(y_vals, (int, float)): y_vals = np.full_like(x_vals, y_vals) # 常數函數
+                    
+                    # 處理常數函數的情況 (如 y=5)
+                    if isinstance(y_vals, (int, float)): 
+                        y_vals = np.full_like(x_vals, y_vals)
+                    
+                    # 處理無窮大值 (避免圖表被極大值撐壞)
+                    # 將超過 +/- 1000 的 y 值設為 NaN (不繪製)，防止連線錯亂
+                    y_vals[y_vals > 1000] = np.nan
+                    y_vals[y_vals < -1000] = np.nan
                     
                     fig = go.Figure()
                     
@@ -197,33 +206,32 @@ if "數學" in selected_subject:
                         line=dict(color='#6b46c1', width=3)
                     ))
 
-                    # 配置 Desmos 風格坐標系
+                    # --- 修改 2: 優化視圖設置 ---
                     fig.update_layout(
                         title=dict(text=f"Function: y = {display_eq}", x=0.5),
                         xaxis=dict(
                             zeroline=True, zerolinewidth=2, zerolinecolor='black',
                             showgrid=True, gridcolor='rgba(0,0,0,0.1)',
-                            range=[-10, 10], # 初始範圍
-                            constrain='domain'
+                            range=[-10, 10], # 這是"初始"看到的範圍，你可以拖拽出去
+                            # 移除了 constrain='domain'，讓你可以自由縮放
                         ),
                         yaxis=dict(
                             zeroline=True, zerolinewidth=2, zerolinecolor='black',
                             showgrid=True, gridcolor='rgba(0,0,0,0.1)',
-                            range=[-6, 6],
-                            scaleanchor="x", scaleratio=1 # 鎖定比例，確保圓形看起來是圓的
+                            range=[-6, 6],   # 初始 Y 軸範圍
+                            scaleanchor="x", scaleratio=1 # 保持 1:1 比例 (圓形不會變橢圓)
                         ),
                         plot_bgcolor='white',
-                        dragmode='pan', # 默認拖拽平移
+                        dragmode='pan', 
                         hovermode='x unified',
                         height=550,
                         margin=dict(l=20, r=20, t=40, b=20)
                     )
                     
-                    # 啟用滾輪縮放
+                    # 配置滾輪縮放
                     config = {
                         'scrollZoom': True, 
                         'displayModeBar': True,
-                        'displaylogo': False,
                         'modeBarButtonsToRemove': ['lasso2d', 'select2d']
                     }
                     
@@ -231,8 +239,6 @@ if "數學" in selected_subject:
                     
                 except Exception as err:
                     st.error(f"無法計算函數值: {err}")
-            else:
-                st.error(f"公式解析錯誤: {display_eq} (請確保使用 x 作為變量，乘法用 *)")
 
     with tab2:
         st.markdown("<div class='feature-card'><h4>📝 智能解題</h4></div>", unsafe_allow_html=True)
@@ -288,4 +294,5 @@ else:
 with st.expander("💬 AI 助手"):
     q = st.text_input("Ask anything:")
     if q: st.write(client.models.generate_content(model="gemini-2.0-flash", contents=q).text)
+
 
