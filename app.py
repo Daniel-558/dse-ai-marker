@@ -121,26 +121,56 @@ if "數學" in selected_subject:
         col_main, col_tools = st.columns([3, 1])
         
         with col_tools:
-            st.markdown("### 🧮 符號鍵盤")
-            # 符號按鈕網格
-            k1, k2, k3 = st.columns(3)
-            if k1.button("x²"): add_symbol("**2")
-            if k2.button("√"): add_symbol("sqrt(")
-            if k3.button("π"): add_symbol("pi")
+            st.markdown("### 🧮 全能鍵盤")
             
-            k4, k5, k6 = st.columns(3)
-            if k4.button("sin"): add_symbol("sin(")
-            if k5.button("cos"): add_symbol("cos(")
-            if k6.button("tan"): add_symbol("tan(")
-            
-            k7, k8, k9 = st.columns(3)
-            if k7.button("("): add_symbol("(")
-            if k8.button(")"): add_symbol(")")
-            if k9.button("÷"): add_symbol("/")
-            
-            st.info("💡 提示：乘號請用 * (例如 2*x)")
-            if st.button("❌ 清空輸入"): st.session_state.math_eq = ""
+            # --- 鍵盤輔助樣式 ---
+            st.markdown("""
+            <style>
+            div[data-testid="stExpander"] div[data-testid="stVerticalBlock"] { gap: 0.5rem; }
+            button { height: auto; padding: 0.2rem 0.5rem !important; font-size: 14px !important; }
+            </style>
+            """, unsafe_allow_html=True)
 
+            # 輔助函數：生成按鈕網格
+            def btn_grid(items, cols=4):
+                columns = st.columns(cols)
+                for i, (label, val) in enumerate(items):
+                    if columns[i % cols].button(label, key=f"btn_{val}_{i}", use_container_width=True):
+                        add_symbol(val)
+
+            # --- 1. 代數與基礎 (Algebra) ---
+            with st.expander("📐 代數與基礎", expanded=True):
+                btn_grid([
+                    ("x", "x"), ("y", "y"), ("÷", "/"), ("^", "**"),
+                    ("x²", "**2"), ("xʸ", "**"), ("√", "sqrt("), ("³√", "cbrt("),
+                    ("|x|", "Abs("), ("(", "("), (")", ")"), ("e", "E")
+                ], cols=4)
+
+            # --- 2. 三角函數 (Trigonometry) ---
+            with st.expander("📐 三角學", expanded=False):
+                st.caption("支持 DSE M2 反三角")
+                btn_grid([
+                    ("sin", "sin("), ("cos", "cos("), ("tan", "tan("),
+                    ("csc", "csc("), ("sec", "sec("), ("cot", "cot("),
+                    ("sin⁻¹", "asin("), ("cos⁻¹", "acos("), ("tan⁻¹", "atan(")
+                ], cols=3)
+
+            # --- 3. 微積分 (Calculus) ---
+            with st.expander("∫ 微積分 (M1/M2)", expanded=True):
+                st.caption("繪圖與運算專用")
+                btn_grid([
+                    ("ln", "log("), ("log₁₀", "log(x,10)"), ("eˣ", "exp("),
+                    ("d/dx", "diff("), ("∫", "integrate("), ("∞", "oo")
+                ], cols=3)
+            
+            # --- 4. 功能鍵 ---
+            c_del, c_clr = st.columns([1, 1])
+            if c_del.button("⬅️ 退格"): 
+                st.session_state.math_eq = st.session_state.math_eq[:-1]
+            if c_clr.button("❌ 清空", type="primary"): 
+                st.session_state.math_eq = ""
+                
+            st.info("💡 提示：微積分繪圖技巧\n\n輸入 `diff(x**2, x)` 可繪製 $x^2$ 的導數圖像。")
         with col_main:
             st.markdown("### y = ...")
             # 綁定 session_state 實現按鈕輸入
@@ -258,3 +288,4 @@ else:
 with st.expander("💬 AI 助手"):
     q = st.text_input("Ask anything:")
     if q: st.write(client.models.generate_content(model="gemini-2.0-flash", contents=q).text)
+
