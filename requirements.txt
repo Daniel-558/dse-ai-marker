@@ -1,6 +1,8 @@
 streamlit
 google-genai
+python-dotenv
 plotly
 fpdf2
-python-docx
-Pillow
+pillow
+pandas
+matplotlib
