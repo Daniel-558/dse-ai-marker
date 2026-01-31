@@ -6,163 +6,164 @@ from fpdf import FPDF
 import io
 import os
 from datetime import datetime
-from docx import Document
 from PIL import Image
 
-# --- 1. 页面配置与高级 UI ---
-st.set_page_config(page_title="DSE AI 超级导师 All-in-One", layout="wide")
+# 1. 页面配置
+st.set_page_config(page_title="DSE English All-in-One", layout="wide")
 
+# 2. 增强 UI 样式
 st.markdown("""
     <style>
     .stApp { background: #f8fafc; }
     .main-header { background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); padding: 2rem; border-radius: 15px; color: white; text-align: center; margin-bottom: 25px; }
-    .card { background: white; border-radius: 12px; padding: 20px; border: 1px solid #e2e8f0; margin-bottom: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
-    .report-container { background: white; padding: 25px; border-radius: 15px; border-left: 6px solid #fbbf24; white-space: pre-wrap; margin-top: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+    /* 报告容器样式 */
+    .report-box { background: white; padding: 25px; border-radius: 15px; border-left: 6px solid #fbbf24; white-space: pre-wrap; margin-top: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+    /* 答疑区样式 */
+    .chat-container { background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; padding: 15px; }
+    /* 修复 Tab 样式 */
     .stTabs [data-baseweb="tab-list"] { gap: 10px; }
-    .stTabs [data-baseweb="tab"] { background-color: #f1f5f9; border-radius: 8px; padding: 12px 24px; font-weight: bold; transition: 0.3s; }
+    .stTabs [data-baseweb="tab"] { background-color: #f1f5f9; border-radius: 8px 8px 0 0; padding: 10px 20px; font-weight: bold; }
     .stTabs [aria-selected="true"] { background-color: #3b82f6 !important; color: white !important; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 2. 初始化 API 与 Session State ---
+# 3. 初始化 API 与持久化状态
 api_key_val = st.secrets.get("GEMINI_API_KEY", "")
 @st.cache_resource
 def get_client(key):
     return Client(api_key=key) if key else None
 client = get_client(api_key_val)
 
+# 核心：确保切换 Tab 时数据不丢失
 if "p2_report" not in st.session_state: st.session_state.p2_report = ""
-if "p2_scores" not in st.session_state: st.session_state.p2_scores = {"Content": 0, "Organization": 0, "Language": 0}
+if "p2_scores" not in st.session_state: st.session_state.p2_scores = {"C": 0, "O": 0, "L": 0}
 if "chat_history" not in st.session_state: st.session_state.chat_history = []
 
-# --- 3. PDF 生成函数 (支持中文逻辑) ---
+# --- PDF 修复逻辑 (增加 UTF-8 兼容性提示) ---
 def generate_pdf(report_text, scores):
     pdf = FPDF()
     pdf.add_page()
-    # 试图加载字体，若无则回退
-    font_path = "simhei.ttf"
-    if os.path.exists(font_path):
-        pdf.add_font('SimHei', '', font_path, uni=True)
-        pdf.set_font('SimHei', '', 12)
-        content = report_text
-    else:
-        pdf.set_font("Helvetica", 'B', 14)
-        content = "Detailed Report (Chinese text omitted, view on web):\n\n" + "".join(re.findall(r'[a-zA-Z0-9\s.,!?:-]', report_text[:500]))
-    
-    pdf.cell(0, 10, "DSE English Diagnosis Report", ln=True, align='C')
+    # 这里的字体处理非常关键，防止报错
+    pdf.set_font("Helvetica", size=12)
+    pdf.cell(0, 10, "DSE English Diagnosis (Text Version)", ln=True, align='C')
+    pdf.ln(10)
+    pdf.multi_cell(0, 10, f"Scores -> Content: {scores['C']} | Org: {scores['O']} | Lang: {scores['L']}")
     pdf.ln(5)
-    pdf.cell(0, 10, f"Scores: C:{scores['Content']} O:{scores['Organization']} L:{scores['Language']}", ln=True)
-    pdf.multi_cell(0, 8, content)
+    # 过滤掉无法在标准 PDF 中显示的特殊字符，防止编码错误
+    safe_text = "".join([i if ord(i) < 128 else ' ' for i in report_text])
+    pdf.multi_cell(0, 7, safe_text[:1000] + "\n\n[Note: Please view full Chinese report in the web portal.]")
     return pdf.output()
 
-# --- 4. 侧边栏：核心工具 ---
+# 4. 侧边栏：全局工具
 with st.sidebar:
     st.title("🔐 DSE Portal")
     if st.text_input("解锁码", type="password") != "DSE2026":
-        st.warning("请输入解锁码")
+        st.info("验证以开启 P1-P4 全功能")
         st.stop()
     
     st.markdown("---")
-    st.markdown("### ⏳ 考试倒计时")
-    days = (datetime(2026, 4, 10) - datetime.now()).days
-    st.metric("DSE 2026 英文科", f"{days} Days")
+    st.markdown(f"### ⏳ DSE 2026 倒数: **{(datetime(2026, 4, 10) - datetime.now()).days} Days**")
     
     st.markdown("---")
-    st.markdown("### 📂 资料扫描仪 (多模态)")
-    uploaded_file = st.file_uploader("支持：作文照片/阅读文本/Data File", type=['png', 'jpg', 'jpeg', 'pdf'])
+    uploaded_file = st.file_uploader("📂 资料扫描仪 (支持照片/PDF)", type=['png', 'jpg', 'jpeg', 'pdf'])
     
     st.markdown("---")
-    st.markdown("### ⏱️ 模拟计时器")
-    m_time = st.selectbox("设定练习时间 (Min)", [20, 45, 60, 120])
-    if st.button("开始计时"): st.toast(f"计时开始，请在 {m_time} 分钟内完成！")
+    if st.button("🧹 清除所有记录"):
+        st.session_state.p2_report = ""
+        st.session_state.chat_history = []
+        st.rerun()
 
-# --- 5. 主界面布局 ---
-st.markdown('<div class="main-header"><h1>🤖 DSE English AI 超级导师 Pro</h1><p>全港首个 P1-P4 全方位 AI 备考平台</p></div>', unsafe_allow_html=True)
+# 5. 主界面布局
+st.markdown('<div class="main-header"><h1>🇬🇧 DSE English AI 超级导师 Pro</h1><p>全港首個 P1-P4 全方位 AI 備考平台</p></div>', unsafe_allow_html=True)
 
-tabs = st.tabs(["📖 Paper 1 Reading", "✍️ Paper 2 Writing", "🎧 Paper 3 Integrated", "🗣️ Paper 4 Speaking"])
+# 左右布局：左侧为 Paper 功能区，右侧为全局导师答疑
+main_col, chat_col = st.columns([1.4, 0.6], gap="medium")
 
-# --- PAPER 1: READING ---
-with tabs[0]:
-    st.markdown("### 🔍 难句精读与考点拆解")
-    p1_text = st.text_area("粘贴 Reading 复杂句子或段落：", height=150, placeholder="The daunting prospect of global economic volatility...")
-    if st.button("AI 思路拆解", key="p1_btn"):
-        with st.spinner("分析中..."):
-            res = client.models.generate_content(model="gemini-2.0-flash", contents=f"你是一位DSE閱讀名師。請解析：1. 繁中翻譯 2. 語法結構（拆解主從句） 3. 預測考題（指代詞/作者態度） 4. 核心詞彙。原文：{p1_text}")
-            st.info(res.text)
+with main_col:
+    tabs = st.tabs(["📖 P1 Reading", "✍️ P2 Writing", "🎧 P3 Integrated", "🗣️ P4 Speaking"])
 
-# --- PAPER 2: WRITING (完整回归) ---
-with tabs[1]:
-    col_p2_1, col_p2_2 = st.columns([1.2, 0.8])
-    with col_p2_1:
-        st.markdown("### ✍️ 作文深度批改")
-        p2_type = st.radio("选择考部分", ["Part A (Short)", "Part B (Long)"], horizontal=True)
-        target_lv = st.select_slider("目标等级", options=["3", "4", "5", "5*", "5**"])
-        user_p2_text = st.text_area("在此输入作文...", height=300)
+    # --- P1: Reading ---
+    with tabs[0]:
+        st.markdown("### 🔍 Reading 逻辑拆解")
+        p1_input = st.text_area("输入复杂段落：", height=150, key="p1_input")
+        if st.button("AI 拆解思路"):
+            with st.spinner("分析中..."):
+                res = client.models.generate_content(model="gemini-2.0-flash", contents=f"解析DSE閱讀段落：1.翻譯 2.句法拆解 3.預測考點。原文：{p1_input}")
+                st.info(res.text)
+
+    # --- P2: Writing (修复：保持显示) ---
+    with tabs[1]:
+        st.markdown("### ✍️ 作文深度批改与 5** 范文")
+        p2_part = st.radio("选择部分", ["Part A (Short)", "Part B (Long)"], horizontal=True)
+        user_p2 = st.text_area("在此粘贴作文内容...", height=250, key="p2_main_input")
         
-        if st.button("🚀 启动批改系统"):
+        if st.button("🚀 启动 AI 深度批改"):
             with st.spinner("阅卷主席评分中..."):
-                prompt = f"""
-                你是一位資深DSE閱卷主席。批改這篇 {p2_type} 作文，目標 {target_lv}。
-                要求：
-                1. [評分分析] 詳細解釋 C/O/L 得分。
-                2. [優缺點] Markdown 列表。
-                3. [5** 範文示範] 針對本題撰寫 200 字示範。
-                4. [金句] 3 個萬用句。
-                最後一行輸出: SCORES: C:數字, O:數字, L:數字 (每項滿分7)。
-                使用繁體中文。
-                """
-                inputs = [prompt, user_p2_text]
-                if uploaded_file and uploaded_file.type.startswith("image"):
-                    inputs.append(Image.open(uploaded_file))
+                prompt = f"""你是一位DSE閱卷主席。批改這篇 {p2_part} 作文。
+                要求：1.[評分分析] 2.[優缺點] 3.[5** 範文示範]約200字 4.[金句]。
+                最後一行必須輸出: SCORES: C:數字, O:數字, L:數字。使用繁體中文。"""
+                inputs = [prompt, user_p2]
+                if uploaded_file: inputs.append(Image.open(uploaded_file))
                 
                 response = client.models.generate_content(model="gemini-2.0-flash", contents=inputs)
                 st.session_state.p2_report = response.text
+                
+                # 提取分数
                 match = re.search(r"SCORES: C:(\d), O:(\d), L:(\d)", response.text)
                 if match:
-                    st.session_state.p2_scores = {"Content": int(match.group(1)), "Organization": int(match.group(2)), "Language": int(match.group(3))}
-
-    with col_p2_2:
+                    st.session_state.p2_scores = {"C": int(match.group(1)), "O": int(match.group(2)), "L": int(match.group(3))}
+        
+        # 即使切换 Tab 也会保持显示的报告区
         if st.session_state.p2_report:
-            total = sum(st.session_state.p2_scores.values())
-            st.markdown(f"#### 实时评估: {total}/21")
-            # 雷达图
-            fig = go.Figure(data=go.Scatterpolar(r=list(st.session_state.p2_scores.values())+[list(st.session_state.p2_scores.values())[0]], theta=['C','O','L','C'], fill='toself', line_color='#3b82f6'))
-            fig.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 7])), height=250, margin=dict(t=20, b=20))
-            st.plotly_chart(fig, use_container_width=True)
+            st.markdown("---")
+            score_col, pdf_col = st.columns([2, 1])
+            with score_col:
+                st.subheader(f"总分: {sum(st.session_state.p2_scores.values())}/21")
+                # 雷达图可视化
+                fig = go.Figure(data=go.Scatterpolar(
+                    r=[st.session_state.p2_scores['C'], st.session_state.p2_scores['O'], st.session_state.p2_scores['L'], st.session_state.p2_scores['C']],
+                    theta=['Content','Organization','Language','Content'], fill='toself'
+                ))
+                fig.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 7])), height=300, margin=dict(t=30, b=30))
+                st.plotly_chart(fig, use_container_width=True)
+            with pdf_col:
+                try:
+                    pdf_data = generate_pdf(st.session_state.p2_report, st.session_state.p2_scores)
+                    st.download_button("📥 下载诊断报告", data=pdf_data, file_name="DSE_Report.pdf")
+                except: st.warning("PDF 下载暂不可用")
             
-            # PDF 下载
-            try:
-                pdf_bytes = generate_pdf(st.session_state.p2_report, st.session_state.p2_scores)
-                st.download_button("📥 下载 5** 诊断报告", data=pdf_bytes, file_name="DSE_Report.pdf")
-            except: st.error("PDF 导出受限")
-            
-            st.markdown(f'<div class="report-container">{st.session_state.p2_report}</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="report-box">{st.session_state.p2_report}</div>', unsafe_allow_html=True)
 
-# --- PAPER 3: INTEGRATED ---
-with tabs[2]:
-    st.markdown("### 🎧 P3 格式模版与整合技巧")
-    p3_task = st.selectbox("选择任务文体", ["Formal Letter", "Report", "Proposal", "Article", "Email"])
-    if st.button("生成 5** 规范"):
-        res = client.models.generate_content(model="gemini-2.0-flash", contents=f"給出 DSE P3 {p3_task} 的 5** 格式模板、常用句式及 Data File 整合技巧。")
-        st.success(res.text)
+    # --- P3: Integrated ---
+    with tabs[2]:
+        st.markdown("### 🎧 P3 整合技巧")
+        p3_type = st.selectbox("任务文体", ["Formal Letter", "Report", "Proposal", "Article"])
+        if st.button("获取 5** 格式模板"):
+            res = client.models.generate_content(model="gemini-2.0-flash", contents=f"提供DSE P3 {p3_type} 的5**格式及Data File搵point技巧。")
+            st.success(res.text)
 
-# --- PAPER 4: SPEAKING ---
-with tabs[3]:
-    st.markdown("### 🗣️ Speaking 论点生成器")
-    spk_topic = st.text_input("输入口试题目 (e.g. Mandatory garbage bags)：")
-    if st.button("脑暴 5** 观点"):
-        res = client.models.generate_content(model="gemini-2.0-flash", contents=f"針對 '{spk_topic}' 提供 3 個深度論點、5 個高級詞彙、3 個 Group Discussion 轉折句。")
-        st.info(res.text)
+    # --- P4: Speaking ---
+    with tabs[3]:
+        st.markdown("### 🗣️ Speaking 论点库")
+        spk_topic = st.text_input("输入口试题目：")
+        if st.button("脑暴 5** 观点"):
+            res = client.models.generate_content(model="gemini-2.0-flash", contents=f"針對'{spk_topic}'提供3個深度論點及轉折金句。")
+            st.info(res.text)
 
-    st.markdown("---")
-    # 底部通用：导师问答
-    st.markdown("### 💬 导师答疑")
-    chat_box = st.container(height=300)
-    for r, t in st.session_state.chat_history:
-        with chat_box: st.chat_message(r).write(t)
+# 6. 右侧：全局导师答疑 (不再随 Tab 消失)
+with chat_col:
+    st.markdown("### 💬 导师实时答疑")
+    st.caption("你可以在此针对任何卷别或批改结果进行追问。")
     
-    if q := st.chat_input("问问导师关于 P1-P4 的任何问题..."):
-        st.session_state.chat_history.append(("User", q))
-        ans = client.models.generate_content(model="gemini-2.0-flash", contents=q)
-        st.session_state.chat_history.append(("AI", ans.text))
+    chat_box = st.container(height=500, border=True)
+    with chat_box:
+        for r, t in st.session_state.chat_history:
+            with st.chat_message(r): st.write(t)
+            
+    if q := st.chat_input("针对批改报告或 DSE 提问..."):
+        st.session_state.chat_history.append(("user", q))
+        # 自动关联 Paper 2 的上下文
+        context = f"学生当前的批改报告是：{st.session_state.p2_report}" if st.session_state.p2_report else ""
+        res = client.models.generate_content(model="gemini-2.0-flash", contents=f"{context}\n\n学生问题：{q}")
+        st.session_state.chat_history.append(("assistant", res.text))
         st.rerun()
