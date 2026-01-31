@@ -109,7 +109,7 @@ def generate_pdf(content, title="DSE Report"):
 with st.sidebar:
     st.markdown("### 👤 考生檔案")
     st.write(f"**等級:** {st.session_state.user_level}")
-    st.progress(min(100, (st.session_state.xp % 1000) / 10), text=f"XP: {st.session_state.xp}")
+st.progress(int((st.session_state.xp % 1000) / 10), text=f"XP: {st.session_state.xp}")
     
     # DSE 倒計時
     days_left = (st.session_state.exam_date - date.today()).days
@@ -269,3 +269,4 @@ with st.expander("💬 DSE 隨身軍師 (Chatbot)", expanded=False):
     if user_q:
         res = client.models.generate_content(model="gemini-2.0-flash", contents=f"你是一個幽默且專業的 DSE 導師。回答：{user_q}")
         st.markdown(f"**AI:** {res.text}")
+
